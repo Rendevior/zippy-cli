@@ -11,3 +11,5 @@ sudo make
 + Curl
 + Wget
 + Aria2c
++ grep
++ awk
