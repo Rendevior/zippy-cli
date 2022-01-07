@@ -72,7 +72,7 @@ CleanUp(){
 		rm "$HOME/.cachedo"
 	fi
 	if [ -d "$ZippyFileLoc" ]; then
-		rm "$ZippyFileLoc"
+		rm "$ZippyFileLoc_name"
 	fi
 }
 
