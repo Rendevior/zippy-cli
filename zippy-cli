@@ -138,8 +138,8 @@ DownInst(){
 }
 
 InfoHelp(){
-	echo 'Usage: emina-cli -i "<search query>"'
-	echo 'Usage: emina-cli [arguments...]'
+	echo 'Usage: zippy-cli -i "<search query>"'
+	echo 'Usage: zippy-cli [arguments...]'
 	echo ''
 	echo "Simple Program that allows you to Upload/Download Files via Command Line"
 	echo ''
