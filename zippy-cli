@@ -165,7 +165,7 @@ ParseArgs(){
 				esac
 				;;
 			v)
-				echo "v0.0.1"
+				echo "v0.0.2"
 				exit 0
 				;;
 			h)
