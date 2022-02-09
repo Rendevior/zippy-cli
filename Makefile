@@ -1,12 +1,12 @@
-PREFIX := /usr/local
+PREFIX := /usr/
 
 all: install
 
 install:
-	cp eivom-cli $(DESTDIR)$(PREFIX)/sbin/zippy-cli
-	chmod 0775 $(DESTDIR)$(PREFIX)/sbin/zippy-cli
+	cp zippy-cli $(PREFIX)/bin/zippy-cli
+	chmod 0775 $(PREFIX)/bin/zippy-cli
 
 uninstall:
-	$(RM) $(PREFIX)/sbin/zippy-cli
+	$(RM) $(PREFIX)/bin/zippy-cli
 	
 .PHONY: all install uninstall
