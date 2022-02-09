@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Default Options
-DownloadUtil="wget"
+DownloadUtil="curl"
 
 GetFileLoc(){
 	if [ "$FileLocation" = "" ]; then
@@ -27,30 +27,21 @@ CheckDir(){
 	fi
 	if [ "$(stat -c '%s' "$ZippyFileLoc_name")" -gt 4000000000 ]; then
 		echo "File size is higher than 500mb" >&2
-		if [ -d "$1" ]; then
-			rm "$ZippyFileLoc_name"
-		fi
+		[ -d "$1" ] && rm "$ZippyFileLoc_name"
 		exit 1
 	fi
 }
 
 GetInfos(){
-	URLLoad=$(
-		wget -qO- "https://www.zippyshare.com/sites/index_old.jsp"
-	)
-	IDup=$(
-		echo "$URLLoad" | \
-		sed -E '/var.*uploadId/q;$!d' | \
-		awk -F["'"] '{print $2}'
-	)
-	Serverup=$(
-		echo "$URLLoad" | \
-		sed -E '/var.*server/q;$!d' | \
-		awk -F["'"] '{print $2}'
-	)
+	URLLoad=$(curl -sL "https://www.zippyshare.com/sites/index_old.jsp")
+	IDup=$(echo "$URLLoad" | sed -E '/var.*uploadId/q;$!d' | \
+		awk -F["'"] '{print $2}')
+	Serverup=$(echo "$URLLoad" | sed -E '/var.*server/q;$!d' | \
+		awk -F["'"] '{print $2}')
 }
 
 UploadFile(){
+	[ ! -e "$HOME/.cachedo" ] && touch "$HOME/.cachedo"
 	curl -o "$HOME/.cachedo" \
 	-F "upload_form=@$ZippyFileLoc_name" \
 	-F "uploadId=${IDup}" \
@@ -58,10 +49,8 @@ UploadFile(){
 }
 
 GetLinkInfos(){
-	ZippyDownloadLink=$(
-		grep -o '\[url\].*\[/url\]' "$HOME/.cachedo" | \
-		sed -E 's_\[url\]|\[/url\]__g'
-	)
+	ZippyDownloadLink=$(sed -n '/<textarea id="names-links" class="file_upload_remote">/,/<\/textarea>/p' "$HOME/.cachedo" | \
+		sed -n '/.*</d;/https/p')
 	echo ''
 	echo "The File Has Been Uploaded"
 	echo "Download Link: $ZippyDownloadLink"
@@ -77,64 +66,36 @@ CleanUp(){
 }
 
 SolverDownldr(){
-	Solv="$1"
-	n="$(( Solv % 2 ))"
-	b="$(( Solv % 3 ))"
-	z="$Solv"
+	echo "$PageLoad" | grep "document.getElementById('dlbutton').href" | grep -oP '\([0-9](.*?)\)' | awk '{print "$("$0")"}'
 }
 
 # Download Instead
 DownInst(){
 	DownLink="$1"
-	SliceDomain=$(
-		echo "$DownLink" | \
-		awk -F[/:] '{print $4}'
-	)
+	SliceDomain=$(echo "$DownLink" | \
+		awk -F[/:] '{print $4}')
 	if ! echo "$SliceDomain" | grep 'zippyshare' > /dev/null; then
 		echo "Unsupported Domain" >&2
 		exit 1
 	fi
-	ZippyMainOrigin=$(
-		echo "$DownLink" | \
-		awk -F[/:] '{print $4}'
-	)
-	PageLoad=$(
-		wget -qO- "$DownLink"
-	)
-	BaseSolver=$(
-		echo "$PageLoad" | \
-		grep -E "var b =" | \
-		sed 's/^.*=[[:space:]]//g;s/%.*//g'
-	)
+	ZippyMainOrigin=$(echo "$DownLink" | \
+		awk -F[/:] '{print $4}')
+	PageLoad=$(curl -sL "$DownLink")
+	# BaseSolver=$(echo "$PageLoad" | grep -E "var b =" | sed 's/^.*=[[:space:]]//g;s/%.*//g')
+	ZippySolve="$(eval echo "$(SolverDownldr)")"
 	# Funtion Used to Solve to get the secret CRSF token
-	SolverDownldr "$BaseSolver"
-	if [ "$BaseSolver" = "" ]; then
+	if [ "$ZippySolve" = "" ]; then
 		echo "The Link You Entered is Not Downloadable"
 		exit 1
 	fi
-	ZippySolve="$(( n + b + z ))"
-	ZippyBridge2=$(
-		echo "$PageLoad" | \
-		grep "document.getElementById('dlbutton').href" | \
-		awk -F['"'] '{print $2}'
-	)
-	ZippyBridge3=$(
-		echo "$PageLoad" | \
-		grep "document.getElementById('dlbutton').href" | \
-		awk -F['"'] '{print $4}'
-	)
-	# NameFile="${ZippyBridge3/[\/]/}"
-	NameFile=$(
-		echo "$ZippyBridge3" | \
-		tr -d '/'
-	)
+	ZippyBridge2=$(echo "$PageLoad" | grep "document.getElementById('dlbutton').href" | \
+		awk -F['"'] '{print $2}')
+	ZippyBridge3=$(echo "$PageLoad" | grep "document.getElementById('dlbutton').href" | \
+		awk -F['"'] '{print $4}')
+	NameFile=$(echo "$ZippyBridge3" | sed 's|/||g')
 	DownloadLinkRes="https://${ZippyMainOrigin}${ZippyBridge2}${ZippySolve}${ZippyBridge3}"
 	# Download Program can be Optional
-	if [ $DownloadUtil = "wget" ]; then
-		"${DownloadUtil}" "$DownloadLinkRes" -O "$NameFile"
-	else
-		"${DownloadUtil}" "$DownloadLinkRes" -o "$NameFile"
-	fi
+	"${DownloadUtil}" "$DownloadLinkRes" -o "$NameFile"
 }
 
 InfoHelp(){
