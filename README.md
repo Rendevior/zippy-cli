@@ -9,7 +9,6 @@ sudo make
 ```
 # Dependencies
 + Curl
-+ Wget
 + Aria2c
 + grep
 + awk
