@@ -1,5 +1,3 @@
-PREFIX := /usr/
-
 all: install
 
 install:
