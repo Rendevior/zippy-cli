@@ -1,185 +1,214 @@
 #!/bin/sh
 
-# Default Options
-DownloadUtil="curl"
+# Variables
+VERSION="v0.1.0"
+download_util="curl"
+base_domain="zippyshare.com"
 
-GetFileLoc(){
-	if [ "$FileLocation" = "" ]; then
-		printf '%s' "Enter File Location: "
-		read -r FileLocation
-		# FileLocation="${REPLY}"
+# Text Processors
+err(){
+	printf "\033[38;5;1m%b\033[0m\n" "${1}" >&2
+}
+
+die(){
+	err "${1}"
+	exit 1
+}
+
+inf(){
+	printf "\033[38;5;3m%b\033[0m\n" "${1}"
+}
+
+suc(){
+	printf "\033[38;5;2m%b\033[0m\n" "${1}"
+}
+
+dep_check(){
+	for deppack; do
+		if ! command -v "${deppack}" >/dev/null ; then
+			err "Program \"${deppack}\" not found. Please install it."
+			[ "${deppack}" = "aria2c" ] && err "To install aria2c, Type <your_package_manager> aria2"
+			exit 1
+		fi
+	done
+}
+
+# -- Main Functions -- #
+get_file_dir(){
+	if [ -z "${1}" ]; then
+		printf '%s' "Enter File Location to Upload: "
+		read -r file_dir
 	fi
 }
 
-Checkers(){
-	ZippyFileLoc="$1"
-	ZippyFileLoc_name="$ZippyFileLoc"
-	if ! [ -e "$ZippyFileLoc" ]; then
-		echo "[ERROR] $ZippyFileLoc: No such file or directory" >&2
-		exit 1
+checkif(){
+	if ! [ -e "${1}" ]; then
+		die "${1}: No such file or directory"
 	fi
 }
 
-CheckDir(){
-	if [ -d "$1" ]; then
-		ZippyFileLoc_name="$ZippyFileLoc_name.zip"
-		zip -r -o "$ZippyFileLoc_name" "$ZippyFileLoc" >/dev/null 2>&1
+is_dir(){
+	file_name="${1}"
+	if [ -d "${file_name}" ]; then
+		dep_check "zip"
+		file_name="${1##*/}.zip"
+		zip -r -o "${file_name}" "${1}" >/dev/null 2>&1
 	fi
-	if [ "$(stat -c '%s' "$ZippyFileLoc_name")" -gt 4000000000 ]; then
-		echo "File size is higher than 500mb" >&2
-		[ -d "$1" ] && rm "$ZippyFileLoc_name"
-		exit 1
-	fi
-}
-
-GetInfos(){
-	URLLoad=$(curl -sL "https://www.zippyshare.com/sites/index_old.jsp")
-	IDup=$(echo "$URLLoad" | sed -E '/var.*uploadId/q;$!d' | \
-		awk -F["'"] '{print $2}')
-	Serverup=$(echo "$URLLoad" | sed -E '/var.*server/q;$!d' | \
-		awk -F["'"] '{print $2}')
-}
-
-UploadFile(){
-	[ ! -e "$HOME/.cachedo" ] && touch "$HOME/.cachedo"
-	curl -o "$HOME/.cachedo" \
-	-F "upload_form=@$ZippyFileLoc_name" \
-	-F "uploadId=${IDup}" \
-	"https://${Serverup}.zippyshare.com/upload" -#
-}
-
-GetLinkInfos(){
-	ZippyDownloadLink=$(sed -n '/<textarea id="names-links" class="file_upload_remote">/,/<\/textarea>/p' "$HOME/.cachedo" | \
-		sed -n '/.*</d;/https/p')
-	echo ''
-	echo "The File Has Been Uploaded"
-	echo "Download Link: $ZippyDownloadLink"
-}
-
-CleanUp(){
-	if [ -f "$HOME/.cachedo"  ]; then
-		rm "$HOME/.cachedo"
-	fi
-	if [ -d "$ZippyFileLoc" ]; then
-		rm "$ZippyFileLoc_name"
+	if [ "$(stat -c '%s' "${file_name}")" -gt 4000000000 ]; then
+		[ -d "${file_name}" ] && rm "${file_name}"
+		die "File size is higher than 500mb"
 	fi
 }
 
-SolverDownldr(){
-	echo "$PageLoad" | grep "document.getElementById('dlbutton').href" | grep -oP '\([0-9](.*?)\)' | awk '{print "$("$0")"}'
+get_infos(){
+	index_jsp="$(curl -sL "https://www.${base_domain}/sites/index_old.jsp")"
+	id_up="$(printf '%s' "${index_jsp}" | sed -E '/var.*uploadId/!d;s_.*=.\x27([^\x27]*)\x27.*_\1_')"
+	serv_up="$(printf '%s' "${index_jsp}" | sed -E '/var.*server/!d;s_.*=.\x27([^\x27]*)\x27.*_\1_')"
 }
 
-# Download Instead
-DownInst(){
-	DownLink="$1"
-	SliceDomain=$(echo "$DownLink" | \
-		awk -F[/:] '{print $4}')
-	if ! echo "$SliceDomain" | grep 'zippyshare' > /dev/null; then
-		echo "Unsupported Domain" >&2
-		exit 1
-	fi
-	ZippyMainOrigin=$(echo "$DownLink" | \
-		awk -F[/:] '{print $4}')
-	PageLoad=$(curl -sL "$DownLink")
-	# BaseSolver=$(echo "$PageLoad" | grep -E "var b =" | sed 's/^.*=[[:space:]]//g;s/%.*//g')
-	ZippySolve="$(eval echo "$(SolverDownldr)")"
-	# Funtion Used to Solve to get the secret CRSF token
-	if [ "$ZippySolve" = "" ]; then
-		echo "The Link You Entered is Not Downloadable"
-		exit 1
-	fi
-	ZippyBridge2=$(echo "$PageLoad" | grep "document.getElementById('dlbutton').href" | \
-		awk -F['"'] '{print $2}')
-	ZippyBridge3=$(echo "$PageLoad" | grep "document.getElementById('dlbutton').href" | \
-		awk -F['"'] '{print $4}')
-	NameFile=$(echo "$ZippyBridge3" | sed 's|/||g')
-	DownloadLinkRes="https://${ZippyMainOrigin}${ZippyBridge2}${ZippySolve}${ZippyBridge3}"
-	# Download Program can be Optional
-	"${DownloadUtil}" "$DownloadLinkRes" -o "$NameFile"
+# Param "${file_name}" "${id_up}"
+upload_file(){
+	ret_url="$(curl -o "-" \
+	-F "upload_form=@${1}" \
+	-F "uploadId=${2}" \
+	"https://${serv_up}.${base_domain}/upload" -# | sed -E '/<textarea id="names-links" class="file_upload_remote">/,/<\/textarea>/!d;/https/!d')"
+	inf "The File Has Been Uploaded"
+	suc "Download Link: ${ret_url}"
+	[ "${file_name##*.}" = "zip" ] && rm -f "${file_name}"
 }
 
-InfoHelp(){
-	echo 'Usage: zippy-cli -i "<search query>"'
-	echo 'Usage: zippy-cli [arguments...]'
-	echo ''
-	echo "Simple Program that allows you to Upload/Download Files via Command Line"
-	echo ''
-	echo "Options:"
-	echo '   -f "<file>"\t\t\t: Insert the File location to Upload'
-	echo '   -d "<url>"\t\t\t: Download a File from ZippyShare'
-	echo "   -v\t\t\t\t: Show the version of the script"
-	echo "   -h\t\t\t\t: Show this help"
-	echo "   --aria\t\t\t: Use Aria2c as Downloader"
-	echo ''
-	echo 'Max file size upload: 500MB'
-	echo ''
+downldr_main(){
+	url_req="${1}"
+	if ! printf '%s' "${url_req}" | grep -q 'zippyshare'; then
+		die "Unsupported Domain"
+	fi
+	ind="$(curl -sL "${url_req}" | sed -E '/document.getElementById.*dl.*.href/!d;s_.*"(/d/[^\"]*)".+.\((.*?)\).+."([^\"]*)".*_\1#\2#\3_g')"
+	solve="$(printf '%s' "${ind}" | printf '%s' "$(($(awk -F '#' '{print $2}')))")"
+	[ -z "${solve}" ] && die "The Link You Entered is Not Downloadable"
+	col="$(printf '%s' "${url_req}" | awk -F'/v/' '{print $1}')$(printf '%s' "${ind}" | sed -E "s_\#(.*?)\#_${solve}_g")"
+	if "${download_util}" "${col}" -o "${col##*/}"; then
+		suc "File \"${col##*/}\" was successfully downloaded"
+	else
+		err "Returned an Error while downloading \"${col##*/}\""
+	fi
+}
+
+show_help(){
+	while IFS= read -r line; do
+		printf "%b\n" "${line}"
+	done <<-EOF
+	Simple program that allows you to upload/download files via command line.
+	
+	 Usage: 
+	     ${0##*/} -f "<file>"
+	     ${0##*/} -d "[<url>|urls.txt]"
+	     ${0##*/} [-m|-v|-h|--aria]
+	
+	 Options:
+	   -f "<file>"\t\t: Insert the File location to Upload
+	   -d "<url>"\t\t: Download a File from ZippyShare
+	   -m\t\t\t: Enable download listing
+	   -v\t\t\t: Show the version of the script
+	   -h\t\t\t: Show this help
+	   --aria\t\t: Use Aria2c as Downloader
+	
+	Max file size upload: 500MB
+	EOF
+}
+
+loop_dl_handler(){
+	if [ "${m_dl}" = "true" ]; then
+		[ "${1##*.}" != "txt" ] && die "List URL must be in .txt file"
+		linkfound="$(grep -c 'zippyshare' "${1}")"
+		[ "${linkfound}" = "0" ] && die "No zippyshare URL found, exiting..."
+		inf "Total of ${linkfound} was found"
+		list="$(grep 'zippyshare' "${1}")"
+		OLDIFS="${IFS}"
+		IFS="
+		"
+		for iter in ${list}; do
+			[ -z "${a}" ] && a="1"
+			inf "Downloading in Progress: [${a}/${linkfound}]"
+			downldr_main "${iter}"
+			a="$(( a + 1 ))"
+		done
+		IFS="${OLDIFS}"
+	else
+		downldr_main "${1}"
+	fi
 }
 
 main(){
-	GetFileLoc
-	Checkers "$FileLocation"
-	CheckDir "$ZippyFileLoc"
-	GetInfos
-	UploadFile
-	GetLinkInfos
-	CleanUp
+	if [ "${is_dl}" = "true" ]; then
+		loop_dl_handler "${loopdl}"
+	else
+		get_file_dir "${file_dir}"
+		checkif "${file_dir}"
+		is_dir "${file_dir}"
+		get_infos
+		upload_file "${file_name}" "${id_up}"
+	fi
 }
 
-ParseArgs(){
-	while getopts ":d:f:-:vh" opt; do
+arg_parser(){
+	while getopts "vhmf:d:-:" opt; do
 		case "${opt}" in
+			v)
+				printf '%s\n' "${VERSION}"
+				exit 0
+				;;
+			h)
+				show_help
+				exit 0
+				;;
+			m)
+				m_dl="true"
+				;;
 			f)
-				case $OPTARG in
+				case "${OPTARG}" in
 					-*)
-						echo "File Location is Not Specified" >&2
-						InfoHelp
+						err "File Location is Not Specified"
+						show_help
 						exit 1
 						;;
 					*)
-						FileLocation="${OPTARG}"
+						file_dir="${OPTARG}"
 						;;
 				esac
 				;;
 			d)
-				case $OPTARG in
+				case "${OPTARG}" in
 					-*)
-						echo "File Location is Not Specified" >&2
-						InfoHelp
+						err "File Location is Not Specified"
+						show_help
 						exit 1
 						;;
 					*)
-						DownInst "${OPTARG}"
-						exit 0
+						is_dl="true"
+						loopdl="${OPTARG}"
 						;;
 				esac
 				;;
 			-)
-				case $OPTARG in
+				case "${OPTARG}" in
 					aria)
-						DownloadUtil="aria2c"
+						dep_check "aria2c"
+						download_util="aria2c"
 					;;
-					*)
-						echo "Invalid Program" >&2
+					help)
+						show_help
 						exit 1
 					;;
 				esac
 				;;
-			v)
-				echo "v0.0.2"
-				exit 0
-				;;
-			h)
-				InfoHelp
-				exit 0
-				;;
 			\?)
-				echo "[${OPTARG}] : is not valid Argument" >&2
-				InfoHelp
+				err "[${OPTARG}] : is not valid Argument"
+				show_help
 				exit 1
 				;;
 			:)
-				echo "[-${OPTARG}] : Argument must have a Value" >&2
-				InfoHelp
+				err "[-${OPTARG}] : Argument must have a Value"
+				show_help
 				exit 1
 				;;
 		esac
@@ -187,5 +216,6 @@ ParseArgs(){
 	shift $((OPTIND -1))
 }
 
-ParseArgs "$@"
+dep_check "grep" "curl" "stat" "sed" "awk"
+arg_parser "${@}"
 main
