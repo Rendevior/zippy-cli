@@ -1,13 +1,13 @@
 #!/bin/sh
 
 # Variables
-VERSION="v0.1.1"
+VERSION="v0.1.2"
 download_util="curl"
 base_domain="zippyshare.com"
 
 # Text Processors
 err(){
-	printf "\033[38;5;1m%b\033[0m\n" "${1}" >&2
+	[ -n "${*}" ] && printf "\033[38;5;1m%b\033[0m\n" "${*}" >&2
 }
 
 die(){
@@ -68,10 +68,7 @@ get_infos(){
 
 # Param "${file_name}" "${id_up}"
 upload_file(){
-	ret_url="$(curl -o "-" \
-	-F "upload_form=@${1}" \
-	-F "uploadId=${2}" \
-	"https://${serv_up}.${base_domain}/upload" -# | sed -E '/<textarea id="names-links" class="file_upload_remote">/,/<\/textarea>/!d;/https/!d')"
+	ret_url="$(curl -o "-" -F "upload_form=@${1}" -F "uploadId=${2}" "https://${serv_up}.${base_domain}/upload" -# | sed -E '/<textarea id="names-links" class="file_upload_remote">/,/<\/textarea>/!d;/https/!d')"
 	inf "The File Has Been Uploaded"
 	suc "Download Link: ${ret_url}"
 	[ "${file_name##*.}" = "zip" ] && rm -f "${file_name}"
@@ -82,7 +79,7 @@ downldr_main(){
 	if ! printf '%s' "${url_req}" | grep -q 'zippyshare'; then
 		die "Unsupported Domain"
 	fi
-	ind="$(curl -sL "${url_req}" | sed -E '/document.getElementById.*dl.*.href/!d;s_.*"(/d/[^\"]*)".+.\((.*?)\).+."([^\"]*)".*_\1#\2#\3_g')"
+	ind="$(curl -sL "${url_req}" | sed -E '/document.getElementById.*dl.*.href/!d;s_.*"(/d/[^\"]*)"\+\(([^\+]*)+.*"([^\"]*)"\;_\1#\2+11#\3_g')"
 	solve="${ind#*#}"
 	solve="$((${solve%%#*}))"
 	[ -z "${solve}" ] && die "The Link You Entered is Not Downloadable"
@@ -101,9 +98,9 @@ show_help(){
 	Simple program that allows you to upload/download files via command line.
 	
 	 Usage: 
-	     ${0##*/} -f "<file>"
-	     ${0##*/} -d "[<url>|urls.txt]"
-	     ${0##*/} [-m|-v|-h|--aria]
+	     ${0##*/} [-f <file>]
+	     ${0##*/} [-m] -d [<url>|urls.txt]
+	     ${0##*/} [-v|-h|--aria]
 	
 	 Options:
 	   -f "<file>"\t\t: Insert the File location to Upload
@@ -128,10 +125,9 @@ loop_dl_handler(){
 		IFS="
 		"
 		for iter in ${list}; do
-			[ -z "${a}" ] && a="1"
+			: "$((a += 1))"
 			inf "Downloading in Progress: [${a}/${linkfound}]"
 			downldr_main "${iter}"
-			a="$(( a + 1 ))"
 		done
 		IFS="${OLDIFS}"
 	else
@@ -198,7 +194,7 @@ arg_parser(){
 					;;
 					help)
 						show_help
-						exit 1
+						exit 0
 					;;
 				esac
 				;;
@@ -214,9 +210,9 @@ arg_parser(){
 				;;
 		esac
 	done
-	shift $((OPTIND -1))
+	shift "$((OPTIND -1))"
 }
 
-dep_check "grep" "curl" "stat" "sed" "awk"
+dep_check "grep" "curl" "stat" "sed" "awk" "zip"
 arg_parser "${@}"
 main
