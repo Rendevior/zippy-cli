@@ -81,7 +81,7 @@ downldr_main(){
 	fi
 	# simply this sed if the regex fails, it will return nothing and solve will return nothing because theres nothing to slice
 	# sed doesn't change its exit code whenever it fails, Note that "[exit-code]" argument in "q" is a gnu extension, it will not work with other sed variants
-	ind="$(curl -sLk "${url_req}" | sed -E '/document.getElementById.*dl.*.href/!d;s_.*"(/d/[^\"]*)"\+\(([^\+]*)+.*"([^\"]*)"\;_\1#\2+11#\3_g')"
+	ind="$(curl -sLk "${url_req}" | sed -nE 's_.*document.getElementById.*dl.*.href.*"(/d/[^\"]*)"\+\(([^\+]*)+.*"([^\"]*)"\;_\1#\2+11#\3_p')"
 	solve="${ind#*#}"
 	[ -z "${solve%%#*}" ] && die "An error occured"
 	if printf '%s' "${solve%%#*}" | grep -qE '^([0-9\-\+\*%/ ]*)$'; then
