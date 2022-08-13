@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Variables
-VERSION="v0.2.1"
+VERSION="v0.2.2"
 download_util="curl"
 base_domain="zippyshare.com"
 
@@ -97,6 +97,10 @@ downldr_main(){
 			2)
 				ind="$(printf '%s' "${ind_urlreq}" | sed -nE 's_.*document.getElementById.*dl.*.href.*"(/d/[^\"]*)".*\(([^\)]*)\).*"([^\"]+)".*_\1#\2#\3_p')"
 				;;
+			3)
+				varb="$(printf '%s' "${ind_urlreq}" | sed -nE '/var b/ {s_.*var.b.=.([^\;]*)\;.*_\1_p;q}')"
+				ind="$(printf '%s' "${ind_urlreq}" | sed -nE "s_.*document.getElementById.*dl.*.href.*\"(/d/[^\"]*)\".*+[[:space:]]([0-9]*).*\).*\"([^\"]+)\".*_\1#\2 * 2 % ${varb}#\3_p")"
+				;;
 			*)
 				die "Failed to fetch scrapings, probably the algorithm changed again"
 				;;
@@ -106,8 +110,7 @@ downldr_main(){
 			solve="$((${solve%%#*}))"
 			is_success="true"	# No need to iterate through patterns if success (for multi-links)
 		else
-			err "Pattern #${ind_iter} failed"
-			unset solve ind
+			unset solve ind varb
 		fi
 	done
 	col="${url_req%%/v/*}$(printf '%s' "${ind}" | sed -E "s_\#(.*?)\#_${solve}_g")"
