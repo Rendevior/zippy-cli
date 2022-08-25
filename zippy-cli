@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Variables
-VERSION="v0.2.1"
+VERSION="v0.2.3"
 download_util="curl"
 base_domain="zippyshare.com"
 
