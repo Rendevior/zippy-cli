@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Variables
-VERSION="v0.2.2"
+VERSION="v0.2.1"
 download_util="curl"
 base_domain="zippyshare.com"
 
@@ -100,6 +100,10 @@ downldr_main(){
 			3)
 				varb="$(printf '%s' "${ind_urlreq}" | sed -nE '/var b/ {s_.*var.b.=.([^\;]*)\;.*_\1_p;q}')"
 				ind="$(printf '%s' "${ind_urlreq}" | sed -nE "s_.*document.getElementById.*dl.*.href.*\"(/d/[^\"]*)\".*+[[:space:]]([0-9]*).*\).*\"([^\"]+)\".*_\1#\2 * 2 % ${varb}#\3_p")"
+				;;
+			4)
+				vara="$(printf '%s' "${ind_urlreq}" | sed -nE '/var a =/ h;$x;s_.*var.*a.=.([^\;]*)\;_\1_g;$p')"
+				ind="$(printf '%s' "${ind_urlreq}" | sed -nE "s_.*document.getElementById.*dl.*.href.*\"(/d/[^\"]*)\".*\"([^\"]+)\".*_\1#${vara} * ${vara} * ${vara} + 3#\2_p")"
 				;;
 			*)
 				die "Failed to fetch scrapings, probably the algorithm changed again"
