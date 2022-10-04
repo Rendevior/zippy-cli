@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Variables
-VERSION="v0.2.3"
+VERSION="v0.2.4"
 download_util="curl"
 base_domain="zippyshare.com"
 
@@ -26,11 +26,11 @@ suc(){
 dep_check(){
 	for deppack; do
 		if ! command -v "${deppack}" >/dev/null ; then
-			err "Program \"${deppack}\" not found. Please install it."
-			[ "${deppack}" = "aria2c" ] && err "To install aria2c, Type <your_package_manager> aria2"
-			exit 1
+			err "Program \"${deppack}\" is not installed."
+			is_err="1"
 		fi
 	done
+	[ "${is_err}" = "1" ] && exit 1
 }
 
 # -- Main Functions -- #
@@ -42,9 +42,7 @@ get_file_dir(){
 }
 
 checkif(){
-	if ! [ -e "${1}" ]; then
-		die "${1}: No such file or directory"
-	fi
+	[ -e "${1}" ] || die "${1}: No such file or directory"
 }
 
 is_dir(){
@@ -86,7 +84,7 @@ downldr_main(){
 		err "Failed retrieving download page"
 		return 1
 	fi
-	# simply this sed if the regex fails, it will return nothing and solve will return nothing because theres nothing to slice
+	# if the sed regex was failed, it will return nothing and also solve will return nothing because theres nothing slice
 	# sed doesn't change its exit code whenever it fails, Note that "[exit-code]" argument in "q" is a gnu extension, it will not work with other sed variants
 	while [ -z "${solve}" ]; do
 		[ "${is_success}" = "true" ] || : "$((ind_iter += 1))"
@@ -119,12 +117,17 @@ downldr_main(){
 	done
 	col="${url_req%%/v/*}$(printf '%s' "${ind}" | sed -E "s_\#(.*?)\#_${solve}_g")"
 	[ -z "${file_out}" ] && file_out="${col##*/}"
-	if "${download_util}" "${col}" -o "${file_out}"; then
-		suc "File \"${col##*/}\" was successfully downloaded"
+	case "${download_util}" in
+		aria2c)	"${download_util}" -x 16 -s 16 --console-log-level="error" --summary-interval="0" --download-result="hide" "${col}" -o "${file_out}" && is_noerr="1"	;;
+		curl)	"${download_util}" "${col}" -o "${file_out}" && is_noerr="1"	;;
+		*)	die 1 "Unknown downloader manager"	;;
+	esac
+	if [ "${is_noerr}" = "1" ]; then
+		suc "\nFile \"${file_out}\" was successfully downloaded"
 	else
-		err "Returned an Error while downloading \"${col##*/}\""
+		err "\nReturned an Error while downloading \"${file_out}\""
 	fi
-	unset ind ind_urlreq
+	unset ind ind_urlreq is_noerr
 }
 
 show_help(){
@@ -143,7 +146,7 @@ show_help(){
 	   -m\t\t\t: Enable download listing
 	   -o\t\t\t: Output file name
 	   -v\t\t\t: Show the version of the script
-	   -h\t\t\t: Show this help
+	   -h, --help\t\t: Show this help
 	   -a, --aria\t\t: Use Aria2c as Downloader
 	
 	Max file size upload: 500MB
