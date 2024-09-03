@@ -1,7 +1,13 @@
 <h1 align="center">zippy-cli</h1>
 <p align="center">
-Unofficial Cli that Uploads/Download Files from Zippyshare written in Shell
-<p>
+Unofficial Cli that Uploads/Download Files from Zippyshare written in Shell.
+</p>
+
+<p align="center">
+This project is discontinued due to Zippyshare Ending its Journey. Refer to: https://github.com/Rendevior/zippy-cli/issues/4
+
+Thanks for their efforts! This project will be archived.
+</p>
 
 ## Install
 ```
